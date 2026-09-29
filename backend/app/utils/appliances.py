@@ -1,6 +1,6 @@
 """Static catalog of what each appliance experiment contains in the dataset.
 
-Source: Home-Appliance-Control-Dataset README + per-appliance info.md files.
+Source: Home-Appliance-Control-Dataset README + per-appliance info files.
 Subject counts: TV 30, Door Lock 15, Electric Light 15, BT Speaker 14, AC 10.
 """
 

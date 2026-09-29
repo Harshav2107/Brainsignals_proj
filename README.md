@@ -15,6 +15,21 @@ frontend/                  # Vite + React + TS + Tailwind + Recharts + lucide-re
 Home-Appliance-Control-Dataset-main/   # dataset (sig_vec/trigger, cal_sig, param.mat)
 ```
 
+## Dataset download (not in git — 3.9 GB)
+
+This repo excludes `Home-Appliance-Control-Dataset-main/` via `.gitignore`
+(GitHub 100 MB/file limit). Download it separately:
+
+- Source: https://github.com/jml226/Home-Appliance-Control-Dataset
+- Paper: Lee et al. 2024, Front. Hum. Neurosci. 18:1320457
+- Place it at project root as `Home-Appliance-Control-Dataset-main/` so the
+  backend loader finds `sig_vec/trigger`, `cal_sig`, `param.mat`.
+
+```bash
+# project root
+git clone https://github.com/jml226/Home-Appliance-Control-Dataset.git Home-Appliance-Control-Dataset-main
+```
+
 ## Dataset notes (verified)
 
 - Trial files: `sig_vec` (channels×time, e.g. 25×30240) + `trigger` (1×time).

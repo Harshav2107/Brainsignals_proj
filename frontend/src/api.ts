@@ -24,6 +24,32 @@ export interface ApplianceInfo {
   note: string;
 }
 
+export interface ModelOption {
+  id: string;
+  name: string;
+}
+
+export async function fetchModels(): Promise<{
+  models: ModelOption[];
+  default: string;
+  available_models: ModelOption[];
+  active_default: string;
+}> {
+  const res = await fetch('/api/models', { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Model catalog request failed (${res.status})`);
+  const j = await res.json();
+  // Normalize: backend sends both {models, default} and legacy
+  // {available_models, active_default}.
+  const models: ModelOption[] = j.models ?? j.available_models ?? [];
+  const defaultId: string = j.default ?? j.active_default ?? 'eeg_tcfnet';
+  return {
+    models,
+    default: defaultId,
+    available_models: models,
+    active_default: defaultId,
+  };
+}
+
 export async function fetchAppliances(): Promise<ApplianceInfo[]> {
   const res = await fetch('/api/appliances', { cache: 'no-store' });
   if (!res.ok) throw new Error(`Catalog request failed (${res.status})`);
@@ -58,12 +84,18 @@ export interface PredictResponse {
   appliance_info?: ApplianceInfo;
   predicted_command?: PredictedCommand | null;
   model_source?: string;
+  model_used?: string;
 }
 
-export async function predictFile(file: File, aggregate = 'first', appliance = ''): Promise<PredictResponse> {
+export async function predictFile(
+  file: File,
+  aggregate = 'first',
+  appliance = '',
+  model_name = 'eeg_tcfnet',
+): Promise<PredictResponse> {
   const fd = new FormData();
   fd.append('file', file);
-  const q = new URLSearchParams({ aggregate, appliance });
+  const q = new URLSearchParams({ aggregate, appliance, model_name });
   const res = await fetch(`/api/predict?${q.toString()}`, { method: 'POST', body: fd });
   if (!res.ok) {
     const txt = await res.text();

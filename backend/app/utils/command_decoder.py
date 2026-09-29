@@ -9,7 +9,7 @@ Method (standard ERP oddball decoding, no labels required):
      with the largest P300 is the decoded target -> mapped to the
      appliance's command label (stimulus_id -> command).
 
-Returns None when no trigger channel exists (e.g. cal_sig.mat files).
+Returns None when no trigger channel exists (e.g. cal_sig files).
 """
 
 from __future__ import annotations
@@ -31,12 +31,9 @@ def _softmax(x: np.ndarray) -> np.ndarray:
     return e / (e.sum() + 1e-12)
 
 
-def decode_command(
-    eeg: np.ndarray,
-    trigger: Optional[np.ndarray],
-    orig_fs: float,
-    commands: List[Dict[str, Any]],
-) -> Optional[Dict[str, Any]]:
+def decode_command(eeg: np.ndarray, trigger: Optional[np.ndarray],
+                   orig_fs: float,
+                   commands: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     """Decode attended stimulus id + per-command probabilities."""
     if trigger is None or len(trigger) < 10 or not commands:
         return None
@@ -59,7 +56,6 @@ def decode_command(
                 if s < 0 or s + n_epoch > t_len:
                     continue
                 ep = eeg[:, s:s + n_epoch].mean(axis=0)  # avg channels
-                # pre-stimulus baseline when available, else epoch mean
                 if s - b0 >= 0:
                     ep = ep - eeg[:, s - b0:s].mean()
                 else:
@@ -74,7 +70,6 @@ def decode_command(
         scores = {sid: float(erps[sid][w0:w1].mean()) for sid in erps}
         ids = sorted(scores)
         logits = np.array([scores[i] for i in ids])
-        # standardise before softmax so probabilities reflect separation
         sd = float(logits.std())
         probs = _softmax(logits / (sd + 1e-9) * 1.5)
         best = ids[int(np.argmax(probs))]
@@ -84,7 +79,8 @@ def decode_command(
             "label": label,
             "confidence": round(float(probs.max()), 4),
             "command_scores": {
-                next(c["label"] for c in commands if c["stimulus_id"] == i): round(float(p), 4)
+                next(c["label"] for c in commands if c["stimulus_id"] == i):
+                    round(float(p), 4)
                 for i, p in zip(ids, probs)
             },
             "erp_scores": {str(i): round(float(scores[i]), 4) for i in ids},

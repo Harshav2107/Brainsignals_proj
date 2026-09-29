@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { UploadCloud, FileUp, BrainCircuit, Activity, Zap, AlertCircle, Loader2 } from 'lucide-react';
 import { predictFile, fetchAppliances, type PredictResponse, type ApplianceInfo } from './api';
+import ModelSelector from './components/ModelSelector';
 import SignalChart from './components/SignalChart';
 import ConfidenceBars from './components/ConfidenceBars';
 import StatusPill from './components/StatusPill';
@@ -15,6 +16,7 @@ export default function App() {
   const [result, setResult] = useState<PredictResponse | null>(null);
   const [catalog, setCatalog] = useState<ApplianceInfo[]>([]);
   const [selectedApp, setSelectedApp] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string>('eeg_tcfnet');
 
   useEffect(() => {
     fetchAppliances().then(setCatalog).catch(() => {});
@@ -24,8 +26,8 @@ export default function App() {
     setError('');
     setResult(null);
     if (!f) return;
-    if (!/\.mat$|\.zip$/i.test(f.name)) {
-      setError('Please upload a .mat file or a .zip containing .mat files.');
+    if (!/\.mat$|\.zip$|\.csv$|\.npy$|\.npz$/i.test(f.name)) {
+      setError('Please upload a .mat, .csv, .npy file or a .zip containing those.');
       return;
     }
     setFile(f);
@@ -36,7 +38,7 @@ export default function App() {
     setLoading(true);
     setError('');
     try {
-      const r = await predictFile(file, 'mean', selectedApp ?? '');
+      const r = await predictFile(file, 'mean', selectedApp ?? '', selectedModel);
       setResult(r);
     } catch (e: any) {
       setError(e?.message ?? 'Prediction failed');
@@ -51,10 +53,10 @@ export default function App() {
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-4">
           <BrainCircuit className="text-sky-400" size={28} />
           <div className="flex-1">
-            <h1 className="text-lg font-semibold">BCI Home Appliance Control · EEG-TCFNet</h1>
+            <h1 className="text-lg font-semibold">BCI Home Appliance Control · Multi-Model</h1>
             <p className="text-xs text-slate-400">
               Upload EEG <span className="font-mono">.mat</span> trials (sig_vec / cal_sig / Data struct) or a{' '}
-              <span className="font-mono">.zip</span> — 120 Hz resample · 1–15 Hz Butterworth · EEGNet+TCN+LSTM+Fuzzy
+              <span className="font-mono">.zip</span> — 120 Hz resample · 1–15 Hz Butterworth · pick EEGNet / Conformer / CNN-BiLSTM / LogReg
             </p>
           </div>
           <StatusPill />
@@ -89,12 +91,12 @@ export default function App() {
             }`}
           >
             <UploadCloud className="mx-auto text-slate-400" size={40} />
-            <p className="mt-3 text-sm text-slate-300">Drag &amp; drop your .mat / .zip here</p>
+            <p className="mt-3 text-sm text-slate-300">Drag &amp; drop your .mat / .csv / .npy / .zip here</p>
             <label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium hover:bg-sky-500">
               <FileUp size={16} /> Choose file
               <input
                 type="file"
-                accept=".mat,.zip"
+                accept=".mat,.zip,.csv,.npy,.npz"
                 className="hidden"
                 onChange={(e) => pick(e.target.files?.[0])}
               />
@@ -108,8 +110,12 @@ export default function App() {
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold disabled:opacity-40 hover:bg-emerald-500"
           >
             {loading ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
-            {loading ? 'Running EEG-TCFNet…' : 'Predict appliance'}
+            {loading ? `Running ${selectedModel}…` : 'Predict appliance'}
           </button>
+
+          <div className="mt-4">
+            <ModelSelector selected={selectedModel} onChange={setSelectedModel} />
+          </div>
 
           {error && (
             <p className="mt-3 flex items-start gap-2 rounded-lg bg-red-950/60 p-3 text-sm text-red-300">
@@ -121,8 +127,8 @@ export default function App() {
             <p className="font-semibold text-slate-300">Pipeline</p>
             <ol className="list-decimal pl-4">
               <li>scipy.io.loadmat → sig_vec / cal_sig / Data.signal</li>
-              <li>Resample 500 Hz → 120 Hz, 6th-order 1–15 Hz bandpass</li>
-              <li>Z-score + outlier clip → EEGNet → TCN → 2×LSTM(30) → Fuzzy → Softmax</li>
+              <li>Resample 500 Hz → 120 Hz, 6th-order 1–15 Hz bandpass + 50 Hz notch + winsorize</li>
+              <li>Z-score + outlier clip → selected model (EEGNet / Conformer / CNN-BiLSTM / LogReg) → Softmax</li>
             </ol>
           </div>
         </section>
@@ -147,7 +153,8 @@ export default function App() {
                     class_id {result.class_id} · top confidence{' '}
                     {(result.confidence_scores[result.predicted_appliance] * 100).toFixed(1)}%
                     {result.files_processed && result.files_processed > 1 ? ` · averaged over ${result.files_processed} files` : ''}
-                    {result.model_source ? ` · model: ${result.model_source}` : ''}
+                    {result.model_used ? ` · model: ${result.model_used}` : ''}
+                    {result.model_source ? ` (${result.model_source})` : ''}
                   </p>
                   {result.predicted_command ? (
                     <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-emerald-600/20 px-3 py-1 text-sm font-semibold text-emerald-300">
